@@ -15,9 +15,13 @@
 package types
 
 import (
+	"strings"
+
 	ignTypes "github.com/coreos/ignition/config/v2_0/types"
 	"github.com/coreos/ignition/config/validate"
 	"github.com/coreos/ignition/config/validate/report"
+
+	"github.com/coreos/container-linux-config-transpiler/config/templating"
 )
 
 type Systemd struct {
@@ -40,6 +44,13 @@ type SystemdUnitDropIn struct {
 func init() {
 	register2_0(func(in Config, ast validate.AstNode, out ignTypes.Config, platform string) (ignTypes.Config, report.Report, validate.AstNode) {
 		for _, unit := range in.Systemd.Units {
+			if templating.HasTemplating([]string{unit.Contents}) {
+				contents, err := templating.PerformTemplating(platform, []string{unit.Contents})
+				if err != nil {
+					return out, report.Report{}, ast
+				}
+				unit.Contents = strings.Join(contents, "\n")
+			}
 			newUnit := ignTypes.SystemdUnit{
 				Name:     ignTypes.SystemdUnitName(unit.Name),
 				Enable:   unit.Enable,
@@ -48,6 +59,13 @@ func init() {
 			}
 
 			for _, dropIn := range unit.DropIns {
+				if templating.HasTemplating([]string{dropIn.Contents}) {
+					contents, err := templating.PerformTemplating(platform, []string{dropIn.Contents})
+					if err != nil {
+						return out, report.Report{}, ast
+					}
+					dropIn.Contents = strings.Join(contents, "\n")
+				}
 				newUnit.DropIns = append(newUnit.DropIns, ignTypes.SystemdUnitDropIn{
 					Name:     ignTypes.SystemdUnitDropInName(dropIn.Name),
 					Contents: dropIn.Contents,
